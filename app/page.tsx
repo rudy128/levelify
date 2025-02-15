@@ -1,101 +1,224 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Task, FormData } from '../types/task';
+import { TaskType, TaskStatus } from '@prisma/client';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [formData, setFormData] = useState<FormData>({
+    name: '',
+    expPoints: '',
+    expiryDateTime: '',
+    type: TaskType.DAILY,
+  });
+  const [totalExp, setTotalExp] = useState(0);
+  const router = useRouter();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      const res = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        router.push('/login');
+      } else {
+        throw new Error('Logout failed');
+      }
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+  
+  const fetchTasks = async () => {
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        if (res.status === 401) {
+          router.push('/login');
+          return;
+        }
+        throw new Error('Failed to fetch tasks');
+      }
+
+      const data: Task[] = await res.json();
+
+      const earnedExp = data.reduce(
+        (acc, task) =>
+          task.completed && task.status !== TaskStatus.FAILED ? acc + task.expPoints : acc,
+        0
+      );
+      setTotalExp(earnedExp);
+      setTasks(data);
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(formData),
+      });
+      console.log(res)
+      if (!res.ok) throw new Error('Failed to create task');
+      setFormData({ name: '', expPoints: '', expiryDateTime: '', type: TaskType.DAILY });
+      fetchTasks();
+    } catch (error) {
+      console.error('Error creating task:', error);
+    }
+  };
+
+  const toggleCompletion = async (task: Task) => {
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ id: task.id, completed: !task.completed }),
+      });
+
+      if (!res.ok) throw new Error('Failed to update task');
+      fetchTasks();
+    } catch (error) {
+      console.error('Error updating task:', error);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await fetch(`/api/tasks?id=${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!res.ok) throw new Error('Failed to delete task');
+      fetchTasks();
+    } catch (error) {
+      console.error('Error deleting task:', error);
+    }
+  };
+
+  const getTaskColor = (task: Task): string => {
+    if (task.status === TaskStatus.FAILED) return 'bg-red-500 text-white';
+    if (task.status === TaskStatus.COMPLETED) return 'bg-green-500 text-white';
+    switch (task.type) {
+      case TaskType.URGENT:
+        return 'bg-red-200';
+      case TaskType.IMPORTANT:
+        return 'bg-yellow-200';
+      default:
+        return 'bg-cream-100';
+    }
+  };
+
+  const renderTaskList = (taskType: TaskType, title: string) => {
+    const filteredTasks = tasks.filter((task) => task.type === taskType);
+    return (
+      <div className="mb-8">
+        <h2 className="text-xl font-bold mb-4">{title}</h2>
+        <ul>
+          {filteredTasks.map((task) => (
+            <li key={task.id} className={`mb-2 p-2 rounded ${getTaskColor(task)}`}>
+              <span style={{ textDecoration: task.completed ? 'line-through' : 'none' }}>
+                {task.name} - {task.expPoints} XP - Expires on:{' '}
+                {task.expiryDateTime ? new Date(task.expiryDateTime).toLocaleString() : 'No expiry'}
+              </span>
+              <span className="ml-2">({task.status})</span>
+              {task.status !== TaskStatus.FAILED && (
+                <>
+                  <button
+                    onClick={() => toggleCompletion(task)}
+                    className="ml-2 bg-blue-500 text-white p-1 rounded"
+                  >
+                    {task.completed ? 'Mark Uncompleted' : 'Mark Completed'}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(task.id)}
+                    className="ml-2 bg-red-500 text-white p-1 rounded"
+                  >
+                    Delete
+                  </button>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  };
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-4">Task Manager</h1>
+      <button 
+      onClick={handleLogout}
+      className="bg-red-500 text-white p-2 rounded"
+    >
+      Logout
+    </button>
+      <h2 className="text-xl mb-4">Total XP: {totalExp}</h2>
+
+      <form onSubmit={handleSubmit} className="mb-8">
+        <input
+          type="text"
+          name="name"
+          placeholder="Task name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          className="border p-2 mr-2"
+        />
+        <input
+          type="number"
+          name="expPoints"
+          placeholder="Exp points"
+          value={formData.expPoints}
+          onChange={(e) => setFormData({ ...formData, expPoints: e.target.value })}
+          className="border p-2 mr-2"
+        />
+        <input
+          type="datetime-local"
+          name="expiryDateTime"
+          value={formData.expiryDateTime}
+          onChange={(e) => setFormData({ ...formData, expiryDateTime: e.target.value })}
+          className="border p-2 mr-2"
+        />
+        <select
+          name="type"
+          value={formData.type}
+          onChange={(e) => setFormData({ ...formData, type: e.target.value as TaskType })}
+          className="border p-2 mr-2"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          {Object.values(TaskType).map((type) => (
+            <option key={type} value={type}>
+              {type}
+            </option>
+          ))}
+        </select>
+        <button type="submit" className="bg-blue-500 text-white p-2 rounded">
+          Add Task
+        </button>
+      </form>
+
+      {renderTaskList(TaskType.URGENT, 'Urgent Tasks')}
+      {renderTaskList(TaskType.IMPORTANT, 'Important Tasks')}
+      {renderTaskList(TaskType.DAILY, 'Daily Tasks')}
+      {renderTaskList(TaskType.WEEKLY, 'Weekly Tasks')}
+      {renderTaskList(TaskType.MONTHLY, 'Monthly Tasks')}
     </div>
   );
 }
