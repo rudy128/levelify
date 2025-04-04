@@ -45,7 +45,7 @@ export default function SignupPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="border p-2 w-full"
+          className="border p-2 w-full text-black"
         />
         <input
           type="password"
@@ -53,7 +53,7 @@ export default function SignupPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="border p-2 w-full"
+          className="border p-2 w-full text-black"
         />
         <button type="submit" className="bg-blue-500 text-white p-2 rounded">
           Signup

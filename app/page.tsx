@@ -180,7 +180,7 @@ export default function Home() {
           placeholder="Task name"
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          className="border p-2 mr-2"
+          className="border p-2 mr-2 text-black"
         />
         <input
           type="number"
@@ -188,20 +188,20 @@ export default function Home() {
           placeholder="Exp points"
           value={formData.expPoints}
           onChange={(e) => setFormData({ ...formData, expPoints: e.target.value })}
-          className="border p-2 mr-2"
+          className="border p-2 mr-2 text-black"
         />
         <input
           type="datetime-local"
           name="expiryDateTime"
           value={formData.expiryDateTime}
           onChange={(e) => setFormData({ ...formData, expiryDateTime: e.target.value })}
-          className="border p-2 mr-2"
+          className="border p-2 mr-2 text-black"
         />
         <select
           name="type"
           value={formData.type}
           onChange={(e) => setFormData({ ...formData, type: e.target.value as TaskType })}
-          className="border p-2 mr-2"
+          className="border p-2 mr-2 text-black"
         >
           {Object.values(TaskType).map((type) => (
             <option key={type} value={type}>
@@ -209,7 +209,7 @@ export default function Home() {
             </option>
           ))}
         </select>
-        <button type="submit" className="bg-blue-500 text-white p-2 rounded">
+        <button type="submit" className="bg-blue-500 text-black text-white p-2 rounded">
           Add Task
         </button>
       </form>
